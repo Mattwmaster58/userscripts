@@ -8,21 +8,33 @@
 // ==/UserScript==
 
 (function() {
-    document.querySelectorAll('.user-grade tr').forEach((e) => {
+    Number.prototype.round = function(places) {
+        return +(Math.round(this + "e+" + places)  + "e-" + places);
+    }
+    const derived_tooltip = "This number was derived from Relative Weight\" and \"Contribution to course total\" columns";
+    document.querySelectorAll('.user-grade tr').forEach((e, index) => {
         if (e.querySelector(".item")) {
             let rel = e.querySelector(".column-weight");
             let contrib = e.querySelector(".column-contributiontocoursetotal");
-            let grade = e.querySelector(".column-percentage");
-            if (rel && contrib && grade.innerText === '-') {
+            let grade_percent = e.querySelector(".column-percentage");
+            let grade = e.querySelector(".column-grade");
+            if (rel && contrib && /^\s*[-–]\s*$/.test(grade.innerText) && /^\s*[-–]\s*$/.test(grade.innerText)) {
+                console.log(index, rel);
                 let rel_parsed = parseColElem(rel);
                 if (rel_parsed) {
+                    let range = e.querySelector(".column-range");
+                    let range_upper_bound = parseFloat(/\d+[-–](\d+)/.exec(range.innerText)[1]);
                     let contrib_parsed = parseColElem(contrib);
-                    let result_percent = Math.round((contrib_parsed / rel_parsed)*100)/100;
-                    grade.innerText = `*${result_percent}%`;
+                    let result_percent = ((contrib_parsed / rel_parsed));
+                    grade.setAttribute("title", derived_tooltip);
+                    grade_percent.setAttribute("title", derived_tooltip);
+                    grade_percent.innerText = `*${(result_percent * 100).round(2)}%`;
+                    grade.innerText = `*${(result_percent * range_upper_bound).round(2)}`;
                 }
             }
         }
     });
+
     function parseColElem(elem) {
         try {
             return parseFloat(/\d{1,2}\.\d{1,2}/.exec(elem.innerText)[0]) || 0;
@@ -30,9 +42,4 @@
             return 0;
         }
     }
-
-    function parseContrib(elem) {
-
-    }
-
 })();
