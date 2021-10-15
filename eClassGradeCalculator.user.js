@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name          	eClass Grade Calculator
+// @name            eClass Grade Calculator
 // @description     Calculates your grade based on "Relative Weight" and "Contribution to course total" columns. Sometimes these columns are populated without your grade being revealed.
-// @author			Mattwmaster58 <mattwmaster58@gmail.com>
+// @author          Mattwmaster58 <mattwmaster58@gmail.com>
 // @namespace       Mattwmaster58 Scripts
-// @match			https://eclass.srv.ualberta.ca/course/user.php
+// @match           https://eclass.srv.ualberta.ca/course/user.php
 // @version         0.1
 // ==UserScript==
 
