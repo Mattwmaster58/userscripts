@@ -5,7 +5,7 @@
 // @namespace       Mattwmaster58 Scripts
 // @match           https://eclass.srv.ualberta.ca/course/user.php
 // @version         0.1
-// ==UserScript==
+// ==/UserScript==
 
 (function() {
     const derived_tooltip = "This number was derived from Relative Weight\" and \"Contribution to course total\" columns";
