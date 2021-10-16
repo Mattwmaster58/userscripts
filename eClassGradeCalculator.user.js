@@ -8,7 +8,7 @@
 // ==/UserScript==
 
 (function() {
-    const derived_tooltip = "This number was derived from Relative Weight\" and \"Contribution to course total\" columns";
+    const derived_tooltip = "This number was derived from \"Relative Weight\" and \"Contribution to course total\" columns";
 
     Number.prototype.round = function(places) {
         return +(Math.round(this + "e+" + places)  + "e-" + places);
