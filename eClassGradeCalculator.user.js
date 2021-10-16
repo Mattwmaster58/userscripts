@@ -4,13 +4,18 @@
 // @author          Mattwmaster58 <mattwmaster58@gmail.com>
 // @namespace       Mattwmaster58 Scripts
 // @match           https://eclass.srv.ualberta.ca/course/user.php
-// @version         0.1
+// @match           https://eclass.srv.ualberta.ca/grade/report/user/index.php
+// @version         0.2
 // ==/UserScript==
 
 (function() {
-    const urlParams = new URLSearchParams(location.search);
-    if (urlParams.get('mode') !== "grade") {
-        return;
+    // if we aren't dealing with this URL: https://eclass.srv.ualberta.ca/grade/report/user/index.php
+    if (!location.pathname.startsWith("/grade/")) {
+        // make sure we're on a page with grades
+        const urlParams = new URLSearchParams(location.search);
+        if (urlParams.get('mode') !== "grade") {
+            return;
+        }
     }
 
     const derived_tooltip = "This number was derived from \"Relative Weight\" and \"Contribution to course total\" columns";
