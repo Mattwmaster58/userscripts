@@ -8,11 +8,17 @@
 // ==/UserScript==
 
 (function() {
+    const urlParams = new URLSearchParams(location.search);
+    if (urlParams.get('mode') !== "grade") {
+        return;
+    }
+
     const derived_tooltip = "This number was derived from \"Relative Weight\" and \"Contribution to course total\" columns";
 
     Number.prototype.round = function(places) {
         return +(Math.round(this + "e+" + places)  + "e-" + places);
     }
+
 
     document.querySelectorAll('.user-grade tr').forEach((e) => {
         if (e.querySelector(".item")) {
