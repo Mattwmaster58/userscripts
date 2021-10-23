@@ -3,9 +3,9 @@
 // @description     Calculates your grade based on "Relative Weight" and "Contribution to course total" columns. Sometimes these columns are populated without your grade being revealed.
 // @author          Mattwmaster58 <mattwmaster58@gmail.com>
 // @namespace       Mattwmaster58 Scripts
-// @match           https://eclass.srv.ualberta.ca/course/user.php
-// @match           https://eclass.srv.ualberta.ca/grade/report/user/index.php
-// @version         0.2
+// @match           https://eclass.srv.ualberta.ca/course/user.php*
+// @match           https://eclass.srv.ualberta.ca/grade/report/user/index.php*
+// @version         0.3
 // ==/UserScript==
 
 (function() {
