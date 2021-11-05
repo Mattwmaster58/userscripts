@@ -1,0 +1,19 @@
+/* ==UserStyle==
+@name        Reddit Sidebar Collapse
+@author      Mattwmaster58 <mattwmaster58@gmail.com>
+@namespace   StylishThemes
+@version     0.1.0
+@license     MIT
+//           half screen threshold 1080p (???)                            V
+@var         number sidebar_remove_threshold "Sidebar Removal Threshold" [655, 0, 3440, 1, "px"]
+@preprocessor less
+==/UserStyle== */
+
+@-moz-document domain("reddit.com") {
+    @media screen and (max-width: @sidebar_remove_threshold) {
+        .side {
+            display: none;
+        }
+    }
+}
+

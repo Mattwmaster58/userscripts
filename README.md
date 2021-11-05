@@ -1,5 +1,7 @@
-# userscripts
-[userscripts](https://greasyfork.org/en/help/installing-user-scripts)  I find useful
+# userscripts/styles
+[userscripts](https://greasyfork.org/en/help/installing-user-scripts) and [userstyles](https://github.com/openstyles/stylus/wiki/Usercss)  I find useful
+
+## userscripts
 
 ### eClassGradeCalculator.user.js [![Install](https://img.shields.io/badge/userscript-install-blue)](https://github.com/Mattwmaster58/userscripts/raw/master/eClassGradeCalculator.user.js)
 
@@ -18,3 +20,9 @@ GitHub UI designers designed the delete dialog the way they did for a reason. If
 #### Demo
 
 ![Demo](./githubQuickDelete_demo.gif)
+
+## userstyles
+
+### redditCollapseSidebar.user.css
+
+Collapses the sidebar when your screen gets to narrow (configurable)
