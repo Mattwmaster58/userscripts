@@ -4,7 +4,7 @@
 @namespace   StylishThemes
 @version     0.1.0
 @license     MIT
-//           half screen threshold 1080p (???)                            V
+//           half screen threshold 1080p (???) weird scaling?             VVV
 @var         number sidebar_remove_threshold "Sidebar Removal Threshold" [655, 0, 3440, 1, "px"]
 @preprocessor less
 ==/UserStyle== */
