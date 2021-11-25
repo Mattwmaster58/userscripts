@@ -21,6 +21,10 @@ GitHub UI designers designed the delete dialog the way they did for a reason. If
 
 ![Demo](./githubQuickDelete_demo.gif)
 
+### ytCompilationMusicControls.user.js [![Install](https://img.shields.io/badge/userscript-install-blue)](https://github.com/Mattwmaster58/userscripts/raw/master/ytCompilationMusicControls.user.js)
+
+Parses a tracklist from a compilation video description to enable usage of media keys to seek tracks within the video (ie, the next/prev buttons on your keyboard). The now playing information is also set. Also include a PoC for shuffling the tracks in the compilation video.
+
 ## userstyles
 
 ### redditCollapseSidebar.user.css
