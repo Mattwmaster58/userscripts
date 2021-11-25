@@ -121,7 +121,7 @@
       let now_playing = this.getNowPlaying();
       if (now_playing) {
         // if going in reverse and
-        if (offset === PREVIOUS && this.videoElement.currentTime - now_playing.start < YCMC.TRACK_START_THRESHOLD) {
+        if (offset === PREVIOUS && this.videoElement.currentTime - now_playing.start > YCMC.TRACK_START_THRESHOLD) {
           offset = 0;
         }
         let track = this.currentTrackList[now_playing.currentIndex + offset];
