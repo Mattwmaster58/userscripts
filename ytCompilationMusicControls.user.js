@@ -4,22 +4,27 @@
 // @author          Mattwmaster58 <mattwmaster58@gmail.com>
 // @namespace       Mattwmaster58 Scripts
 // @match           https://www.youtube.com/watch
+// @run-at          document-start
+// @grant           GM_registerMenuCommand
 // @version         0.1
 // ==/UserScript==
 
 (function () {
-
-  // https://stackoverflow.com/a/6904551
-
   class YCMC {
+    // if we're within this threshold of the track start and a seekPrevious is issued,
+    // we go back to the previous track instead of the start of the current track
     static TRACK_START_THRESHOLD = 4;
     static PLAYER_SETUP_QUERY_INTERVAL_MS = 200;
-    SHUFFLE_ON = false;
-    VIDEO_ID = location.href.match(/(?:youtu\.be\/|youtube\.com(?:\/embed\/|\/v\/|\/watch\?v=|\/user\/\S+|\/ytscreeningroom\?v=|\/sandalsResorts#\w\/\w\/.*\/))([^\/&]{10,12})/)[1];
+    recentlySeeked = false;
+    shuffleOn = false;
+    // https://stackoverflow.com/a/6904551
+    static VIDEO_ID = location.href.match(/(?:youtu\.be\/|youtube\.com(?:\/embed\/|\/v\/|\/watch\?v=|\/user\/\S+|\/ytscreeningroom\?v=|\/sandalsResorts#\w\/\w\/.*\/))([^\/&]{10,12})/)[1];
+
     defaultTrackList;
     currentTrackList;
     videoElement;
-
+    ogNextHandler = null;
+    ogPreviousHandler = null;
 
     parseTextForTimings(desc_text) {
       let tracks = [];
@@ -55,8 +60,8 @@
     }
 
     toggleShuffle() {
-      this.SHUFFLE_ON = !this.SHUFFLE_ON;
-      if (SHUFFLE_ON) {
+      this.shuffleOn = !this.shuffleOn;
+      if (this.shuffleOn) {
         log(`shuffling ${this.currentTrackList.length} tracks`);
         // https://stackoverflow.com/questions/2450954/how-to-randomize-shuffle-a-javascript-array
         let track_len = this.currentTrackList.length;
@@ -71,13 +76,14 @@
         this.currentTrackList = [...this.defaultTrackList]
       }
       [...this.currentTrackList].forEach((track, idx) => {
-        track.shuffle_index = idx;
+        track.currentIndex = idx;
       });
     }
 
     seekTo(track) {
       if (track) {
         log(`seeking to track ${JSON.stringify(track)}`);
+        this.recentlySeeked = true;
         this.currentTrack = track;
         this.nextTrack = null;
         this.videoElement.currentTime = track.start;
@@ -96,7 +102,7 @@
           artist: this.channelName,
           artwork: [
             {
-              src: `https://i.ytimg.com/vi/${this.VIDEO_ID}/mqdefault.jpg`,
+              src: `https://i.ytimg.com/vi/${YCMC.VIDEO_ID}/mqdefault.jpg`,
               sizes: '320x180',
               type: 'image/jpeg'
             }
@@ -105,23 +111,31 @@
       }
     }
 
-    seekNext = () => this.seekFromCurrent(1);
-    seekPrevious = () => this.seekFromCurrent(-1);
+    seekNext = (event) => this.seekFromCurrent(1, event);
+    seekPrevious = (event) => this.seekFromCurrent(-1, event);
 
-    seekFromCurrent(offset) {
-      log(`received seek ${offset === -1 ? "previous" : "next"} command at ${this.videoElement.currentTime}`)
+    seekFromCurrent(offset, event) {
+      const NEXT = 1,
+        PREVIOUS = -1;
+      log(`received seek ${offset === PREVIOUS ? "previous" : "next"} command at ${this.videoElement.currentTime}`)
       let now_playing = this.getNowPlaying();
       if (now_playing) {
         // if going in reverse and
-        if (offset === -1 && this.videoElement.currentTime - now_playing.start < YCMC.TRACK_START_THRESHOLD) {
+        if (offset === PREVIOUS && this.videoElement.currentTime - now_playing.start < YCMC.TRACK_START_THRESHOLD) {
           offset = 0;
         }
-        let track = this.currentTrackList[now_playing.shuffle_index + offset];
-        self.seekTo(track);
+        let track = this.currentTrackList[now_playing.currentIndex + offset];
+        if (!track) {
+          if (offset === PREVIOUS && this.ogPreviousHandler) {
+            this.ogPreviousHandler(event);
+          } else if (offset === NEXT && this.ogNextHandler) {
+            this.ogNextHandler(event);
+          }
+        }
+        this.seekTo(track);
       } else {
         log('could not resolve currently playing track, cannot seek relative to it');
       }
-
     }
 
     setup() {
@@ -130,11 +144,12 @@
 
       log(`parsed ${this.defaultTrackList.length} tracks`);
       if (this.defaultTrackList.length) {
+        GM_registerMenuCommand("shuffle", this.toggleShuffle, "s");
         this.videoElement = document.querySelector('video');
         this.channelName = document.querySelector("#player ~ #meta .ytd-channel-name a").textContent.trim();
 
-        navigator.mediaSession.setActionHandler('nexttrack', this.seekNext);
-        navigator.mediaSession.setActionHandler('previoustrack', this.seekPrevious);
+        navigator.mediaSession.setActionHandler('nexttrack', this.seekNext, true);
+        navigator.mediaSession.setActionHandler('previoustrack', this.seekPrevious, true);
         this.videoElement.addEventListener('timeupdate', this.timeUpdateHandler.bind(this));
       }
     }
@@ -144,17 +159,22 @@
         this.setNowPlaying();
       }
       this.currentTrack = this.currentTrack || this.getNowPlaying();
-      this.nextTrack = this.nextTrack || this.currentTrack && this.defaultTrackList[this.currentTrack.index + 1];
+      this.nextTrack = this.nextTrack || this.currentTrack && this.defaultTrackList[this.currentTrack.defaultIndex + 1];
       const curTimeAfterTrackStart = this.currentTrack && this.videoElement.currentTime >= this.currentTrack.start;
-      const curTimeBeforeNextTrackStart = this.currentTrack && (this.nextTrack && this.nextTrack.start > this.video.currentTime) || !this.nextTrack;
+      const curTimeBeforeNextTrackStart = this.currentTrack && (this.nextTrack && this.nextTrack.start > this.videoElement.currentTime) || !this.nextTrack;
       if (!this.currentTrack || (curTimeAfterTrackStart && curTimeBeforeNextTrackStart)) {
         return;
       }
-      log(`currentTime ${this.videoElement.currentTime} out of range !(${this.currentTrack.start} <= ${this.video.currentTime} < ${this.nextTrack.start}), updating track info`);
-      if (this.SHUFFLE_ON) {
+      if (this.recentlySeeked) {
+        log("recently seeked, ignoring player head boundary crossing");
+        this.recentlySeeked = false;
+        return;
+      }
+      log(`currentTime ${this.videoElement.currentTime} out of range !(${this.currentTrack.start} <= ${this.videoElement.currentTime} < ${this.nextTrack.start}), updating track info`);
+      if (this.shuffleOn) {
         // go to the next track in the shuffled playlist been shuffled
         log(`shuffle is currently on, retrieving next track`);
-        let next_shuffled_track = this.currentTrackList[this.currentTrack.shuffle_index + 1];
+        let next_shuffled_track = this.currentTrackList[this.currentTrack.currentIndex + 1];
         this.seekTo(next_shuffled_track);
       } else {
         // otherwise, just let the player progress automatically
@@ -168,7 +188,7 @@
     waitToSetup() {
       log("waiting for YT Player to load");
       let setupPoller = window.setInterval(() => {
-        if (!this.VIDEO_ID) {
+        if (!YCMC.VIDEO_ID) {
           log("parsing youtube video ID failed, presuming non-video page");
           window.clearInterval(setupPoller);
         } else if (document.querySelector("ytd-watch-flexy") && document.querySelector("video")) {
@@ -177,6 +197,32 @@
           window.clearInterval(setupPoller);
         }
       }, YCMC.PLAYER_SETUP_QUERY_INTERVAL_MS);
+    }
+
+    hookMediaSessionSetActionHandler() {
+      log(`hooking mediaSession.setActionHandler`);
+      const oSetActionHandler = window.navigator.mediaSession.setActionHandler.bind(window.navigator.mediaSession);
+      navigator.mediaSession.setActionHandler = window.navigator.setActionHandler = (action, handler, friendly) => {
+        if (friendly) {
+          log(`received friendly setActionHandler call ${action} ${handler}`);
+          return oSetActionHandler(action, handler);
+        }
+        if (action === "nexttrack") {
+          // noinspection EqualityComparisonWithCoercionJS
+          if (this.ogNextHandler != handler) {
+            log(`set ogNextHandler from ${this.ogNextHandler} to ${handler}`);
+          }
+          this.ogNextHandler = handler;
+        } else if (action === "previoustrack") {
+          // noinspection EqualityComparisonWithCoercionJS
+          if (this.ogPreviousHandler != handler) {
+            log(`set ogPreviousHandler from ${this.ogPreviousHandler} to ${handler}`);
+          }
+          this.ogPreviousHandler = handler;
+        } else {
+          return oSetActionHandler(action, handler);
+        }
+      }
     }
   }
 
@@ -196,5 +242,8 @@
   }
 
   let ycmc = new YCMC();
-  ycmc.waitToSetup();
+  ycmc.hookMediaSessionSetActionHandler()
+  window.addEventListener("load", function(){
+    ycmc.waitToSetup();
+  });
 })();
