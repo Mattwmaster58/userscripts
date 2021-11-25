@@ -144,7 +144,7 @@
 
       log(`parsed ${this.defaultTrackList.length} tracks`);
       if (this.defaultTrackList.length) {
-        GM_registerMenuCommand("shuffle", this.toggleShuffle, "s");
+        GM_registerMenuCommand("shuffle", this.toggleShuffle.bind(this), "s");
         this.videoElement = document.querySelector('video');
         this.channelName = document.querySelector("#player ~ #meta .ytd-channel-name a").textContent.trim();
 
