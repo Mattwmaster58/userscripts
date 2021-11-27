@@ -15,16 +15,26 @@
     // we go back to the previous track instead of the start of the current track
     static TRACK_START_THRESHOLD = 4;
     static PLAYER_SETUP_QUERY_INTERVAL_MS = 200;
-    recentlySeeked = false;
-    shuffleOn = false;
-    // https://stackoverflow.com/a/6904551
-    static VIDEO_ID = location.href.match(/(?:youtu\.be\/|youtube\.com(?:\/embed\/|\/v\/|\/watch\?v=|\/user\/\S+|\/ytscreeningroom\?v=|\/sandalsResorts#\w\/\w\/.*\/))([^\/&]{10,12})/)[1];
+    // anything this or less many tracks will not be considered a compilation
+    static NOT_A_COMPILATION_THRESHOLD = 3;
+    // if we find this amount of tracks or less, we should continue our search (eg, in the comments)
+    static KEEP_SEARCHING_THRESHOLD = 6;
+    static COMMENT_SEARCH_LIMIT = 10;
 
+    recentlySeeked;
+    shuffleOn;
+    VIDEO_ID;
     defaultTrackList;
     currentTrackList;
     videoElement;
-    ogNextHandler = null;
-    ogPreviousHandler = null;
+    ogNextHandler;
+    ogPreviousHandler;
+
+    resetInst() {
+      this.recentlySeeked = this.shuffleOn = false;
+      this.VIDEO_ID = location.href.match(/(?:youtu\.be\/|youtube\.com(?:\/embed\/|\/v\/|\/watch\?v=|\/user\/\S+|\/ytscreeningroom\?v=|\/sandalsResorts#\w\/\w\/.*\/))([^\/&]{10,12})/)[1];
+      this.defaultTrackList = this.currentTrackList = this.videoElement = this.ogNextHandler = this.ogPreviousHandler = null;
+    }
 
     parseTextForTimings(desc_text) {
       let tracks = [];
@@ -45,9 +55,35 @@
       return tracks;
     }
 
-    parseYTDesc() {
-      const desc_text = document.querySelector("#description yt-formatted-string").textContent;
-      return this.parseTextForTimings(desc_text);
+    parseFromAnywhere() {
+      let attempts = [];
+      const vidDesc = document.querySelector("#description yt-formatted-string").textContent;
+      _log(`attempted parse of YT description`);
+      attempts.push(this.parseTextForTimings(vidDesc));
+      // todo: make this trigger a comment loading via scroll events?
+      // comments unloaded by default
+      if (false && attempts[0].length <= YCMC.KEEP_SEARCHING_THRESHOLD) {
+        // don't ask me why there's duplicate IDs
+        for (const [idx, commentElem] of document.querySelectorAll("#contents #content #content-text").entries()) {
+          if (idx >= YCMC.COMMENT_SEARCH_LIMIT) {
+            break;
+          }
+          _log(`attempted parse of comment ${idx}`);
+          attempts.push(this.parseTextForTimings(commentElem.textContent));
+          if (attempts[idx + 1].length > YCMC.KEEP_SEARCHING_THRESHOLD) {
+            return attempts[idx + 1];
+          }
+        }
+      }
+      const max = attempts.reduce((prev, current) => {
+        return (prev.length > current.length) ? prev : current;
+      });
+      if (max.length <= YCMC.NOT_A_COMPILATION_THRESHOLD) {
+        _warn(`longest sequence of timestamps found was only ${max.length}, which is < ${YCMC.NOT_A_COMPILATION_THRESHOLD}`);
+        return [];
+      } else {
+        return max;
+      }
     }
 
     getNowPlaying() {
@@ -62,7 +98,7 @@
     toggleShuffle() {
       this.shuffleOn = !this.shuffleOn;
       if (this.shuffleOn) {
-        log(`shuffling ${this.currentTrackList.length} tracks`);
+        _log(`shuffling ${this.currentTrackList.length} tracks`);
         // https://stackoverflow.com/questions/2450954/how-to-randomize-shuffle-a-javascript-array
         let track_len = this.currentTrackList.length;
         while (track_len) {
@@ -72,7 +108,7 @@
           this.currentTrackList[idx] = temp;
         }
       } else {
-        log(`unshuffling currently shuffled list`);
+        _log(`unshuffling currently shuffled list`);
         this.currentTrackList = [...this.defaultTrackList]
       }
       [...this.currentTrackList].forEach((track, idx) => {
@@ -82,27 +118,27 @@
 
     seekTo(track) {
       if (track) {
-        log(`seeking to track ${JSON.stringify(track)}`);
+        _log(`seeking to track ${JSON.stringify(track)}`);
         this.recentlySeeked = true;
         this.currentTrack = track;
         this.nextTrack = null;
         this.videoElement.currentTime = track.start;
         this.setNowPlaying(track);
       } else {
-        log(`failed to seek. track is undefined`);
+        _warn(`failed to seek. track is undefined`);
       }
     }
 
     setNowPlaying(track) {
       let nowPlaying = track || this.getNowPlaying();
-      log(`setting up now playing: ${JSON.stringify(nowPlaying)}`);
+      _log(`setting up now playing: ${JSON.stringify(nowPlaying)}`);
       if (nowPlaying?.title) {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: nowPlaying.title,
           artist: this.channelName,
           artwork: [
             {
-              src: `https://i.ytimg.com/vi/${YCMC.VIDEO_ID}/mqdefault.jpg`,
+              src: `https://i.ytimg.com/vi/${this.VIDEO_ID}/mqdefault.jpg`,
               sizes: '320x180',
               type: 'image/jpeg'
             }
@@ -117,7 +153,7 @@
     seekFromCurrent(offset, event) {
       const NEXT = 1,
         PREVIOUS = -1;
-      log(`received seek ${offset === PREVIOUS ? "previous" : "next"} command at ${this.videoElement.currentTime}`)
+      _log(`received seek ${offset === PREVIOUS ? "previous" : "next"} command at ${this.videoElement.currentTime}`)
       let now_playing = this.getNowPlaying();
       if (now_playing) {
         // if going in reverse and
@@ -134,15 +170,15 @@
         }
         this.seekTo(track);
       } else {
-        log('could not resolve currently playing track, cannot seek relative to it');
+        _warn('could not resolve currently playing track, cannot seek relative to it');
       }
     }
 
     setup() {
-      this.defaultTrackList = this.parseYTDesc();
+      this.defaultTrackList = this.parseFromAnywhere();
       this.currentTrackList = [...this.defaultTrackList];
 
-      log(`parsed ${this.defaultTrackList.length} tracks`);
+      _log(`parsed ${this.defaultTrackList.length} tracks`);
       if (this.defaultTrackList.length) {
         GM_registerMenuCommand("shuffle", this.toggleShuffle.bind(this), "s");
         this.videoElement = document.querySelector('video');
@@ -166,14 +202,14 @@
         return;
       }
       if (this.recentlySeeked) {
-        log("recently seeked, ignoring player head boundary crossing");
+        _log("recently seeked, ignoring player head boundary crossing");
         this.recentlySeeked = false;
         return;
       }
-      log(`currentTime ${this.videoElement.currentTime} out of range !(${this.currentTrack.start} <= ${this.videoElement.currentTime} < ${this.nextTrack.start}), updating track info`);
+      _log(`currentTime ${this.videoElement.currentTime} out of range !(${this.currentTrack.start} <= ${this.videoElement.currentTime} < ${this.nextTrack.start}), updating track info`);
       if (this.shuffleOn) {
         // go to the next track in the shuffled playlist been shuffled
-        log(`shuffle is currently on, retrieving next track`);
+        _log(`shuffle is currently on, retrieving next track`);
         let next_shuffled_track = this.currentTrackList[this.currentTrack.currentIndex + 1];
         this.seekTo(next_shuffled_track);
       } else {
@@ -184,39 +220,40 @@
       this.nextTrack = null;
     }
 
-
     waitToSetup() {
-      log("waiting for YT Player to load");
+      this.resetInst();
+      _log("waiting for YT Player to load");
       let setupPoller = window.setInterval(() => {
-        if (!YCMC.VIDEO_ID) {
-          log("parsing youtube video ID failed, presuming non-video page");
+        if (!this.VIDEO_ID) {
+          _log("parsing youtube video ID failed, presuming non-video page");
           window.clearInterval(setupPoller);
         } else if (document.querySelector("ytd-watch-flexy") && document.querySelector("video")) {
-          log("found player, setting up");
+          _log("found player, setting up");
           this.setup();
           window.clearInterval(setupPoller);
         }
+
       }, YCMC.PLAYER_SETUP_QUERY_INTERVAL_MS);
     }
 
     hookMediaSessionSetActionHandler() {
-      log(`hooking mediaSession.setActionHandler`);
+      _log(`hooking mediaSession.setActionHandler`);
       const oSetActionHandler = window.navigator.mediaSession.setActionHandler.bind(window.navigator.mediaSession);
       navigator.mediaSession.setActionHandler = window.navigator.setActionHandler = (action, handler, friendly) => {
         if (friendly) {
-          log(`received friendly setActionHandler call ${action} ${handler}`);
+          _log(`received friendly setActionHandler call ${action} ${handler}`);
           return oSetActionHandler(action, handler);
         }
         if (action === "nexttrack") {
           // noinspection EqualityComparisonWithCoercionJS
           if (this.ogNextHandler != handler) {
-            log(`set ogNextHandler from ${this.ogNextHandler} to ${handler}`);
+            _log(`set ogNextHandler from ${this.ogNextHandler} to ${handler}`);
           }
           this.ogNextHandler = handler;
         } else if (action === "previoustrack") {
           // noinspection EqualityComparisonWithCoercionJS
           if (this.ogPreviousHandler != handler) {
-            log(`set ogPreviousHandler from ${this.ogPreviousHandler} to ${handler}`);
+            _log(`set ogPreviousHandler from ${this.ogPreviousHandler} to ${handler}`);
           }
           this.ogPreviousHandler = handler;
         } else {
@@ -232,9 +269,14 @@
   }
 
 
-  function log(...args) {
-    return console.log(...["[YCMC]", ...args]);
+  function _log(...args) {
+    return console.log(...["%c[YCMC]", "color: green", ...args]);
   }
+
+  function _warn(...args) {
+    return console.log(...["%c[YCMC]", "color: yellow", ...args]);
+  }
+
 
   // https://stackoverflow.com/a/63856062
   function padArrayStart(arr, len, padding) {
@@ -243,7 +285,8 @@
 
   let ycmc = new YCMC();
   ycmc.hookMediaSessionSetActionHandler()
-  window.addEventListener("load", function(){
-    ycmc.waitToSetup();
+  window.addEventListener("yt-navigate-finish", () => {
+        ycmc.waitToSetup();
   });
+
 })();
