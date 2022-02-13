@@ -34,9 +34,9 @@ ie, the next/prev buttons on your keyboard). The now playing information is also
 
 #### Demo
 
-./demo/ytCompilationMusicControl_demo.mp4
+![Demo](./demo/ytCompilationMusicControl_demo.gif)
 
-[Video](https://www.youtube.com/watch?v=-N-jQzBXkUU) from the demo. The chapter list does not need to be open to use this userscript, it was opened to show the video being seeked around to different chapters. Only the media keys are being pressed. The volume/media flyout is provided by [ModernFlyouts](https://modernflyouts-community.github.io/) that integrates with Windows, not this extension.
+[Video](https://www.youtube.com/watch?v=-N-jQzBXkUU) watched in the demo. The chapter list does not need to be open to use this userscript, it was opened to show the video being seeked around to different chapters. Only the media keys are being pressed. The volume/media flyout is provided by [ModernFlyouts](https://modernflyouts-community.github.io/) that integrates with Windows, not this extension.
 
 ## userstyles
 
