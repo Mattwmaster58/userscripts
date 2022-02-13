@@ -32,39 +32,54 @@
 
     resetInst() {
       this.recentlySeeked = this.shuffleOn = false;
-      this.VIDEO_ID = location.href.match(/(?:youtu\.be\/|youtube\.com(?:\/embed\/|\/v\/|\/watch\?v=|\/user\/\S+|\/ytscreeningroom\?v=|\/sandalsResorts#\w\/\w\/.*\/))([^\/&]{10,12})/)[1];
-      this.defaultTrackList = this.currentTrackList = this.videoElement = this.ogNextHandler = this.ogPreviousHandler = null;
+      this.VIDEO_ID = location.href.match(
+        /(?:youtu\.be\/|youtube\.com(?:\/embed\/|\/v\/|\/watch\?v=|\/user\/\S+|\/ytscreeningroom\?v=|\/sandalsResorts#\w\/\w\/.*\/))([^\/&]{10,12})/
+      )[1];
+      this.defaultTrackList =
+        this.currentTrackList =
+        this.videoElement =
+        this.ogNextHandler =
+        this.ogPreviousHandler =
+          null;
     }
 
     parseTextForTimings(desc_text) {
       let tracks = [];
       const timings = desc_text.matchAll(
-        /^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?\D[\s\-:]*(.*)\s*/gmi
+        /^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?\D[\s\-:]*(.*)\s*/gim
       );
       [...timings].forEach((match, defaultIndex) => {
         let hh, mm, ss, start;
-        [hh, mm, ss] = padArrayStart(match.slice(1, 4).filter(Boolean), 3, 0).map(x => parseInt(x, 10))
+        [hh, mm, ss] = padArrayStart(
+          match.slice(1, 4).filter(Boolean),
+          3,
+          0
+        ).map((x) => parseInt(x, 10));
         start = (hh || 0) * 60 * 60 + (mm || 0) * 60 + ss;
         tracks.push({
           currentIndex: defaultIndex,
           defaultIndex,
           start,
-          title: match[4]
+          title: match[4],
         });
-      })
+      });
       return tracks;
     }
 
     parseFromAnywhere() {
       let attempts = [];
-      const vidDesc = document.querySelector("#description yt-formatted-string").textContent;
+      const vidDesc = document.querySelector(
+        "#description yt-formatted-string"
+      ).textContent;
       _log(`attempted parse of YT description`);
       attempts.push(this.parseTextForTimings(vidDesc));
       // todo: make this trigger a comment loading via scroll events?
       // comments unloaded by default
       if (false && attempts[0].length <= YCMC.KEEP_SEARCHING_THRESHOLD) {
         // don't ask me why there's duplicate IDs
-        for (const [idx, commentElem] of document.querySelectorAll("#contents #content #content-text").entries()) {
+        for (const [idx, commentElem] of document
+          .querySelectorAll("#contents #content #content-text")
+          .entries()) {
           if (idx >= YCMC.COMMENT_SEARCH_LIMIT) {
             break;
           }
@@ -76,10 +91,12 @@
         }
       }
       const max = attempts.reduce((prev, current) => {
-        return (prev.length > current.length) ? prev : current;
+        return prev.length > current.length ? prev : current;
       });
       if (max.length <= YCMC.NOT_A_COMPILATION_THRESHOLD) {
-        _warn(`longest sequence of timestamps found was only ${max.length}, which is < ${YCMC.NOT_A_COMPILATION_THRESHOLD}`);
+        _warn(
+          `longest sequence of timestamps found was only ${max.length}, which is < ${YCMC.NOT_A_COMPILATION_THRESHOLD}`
+        );
         return [];
       } else {
         return max;
@@ -90,7 +107,9 @@
       const cur_time = this.videoElement.currentTime;
       for (const track of this.defaultTrackList) {
         if (track.start > cur_time) {
-          return this.defaultTrackList[clamp(track.defaultIndex - 1, 0, this.defaultTrackList.length - 1)];
+          return this.defaultTrackList[
+            clamp(track.defaultIndex - 1, 0, this.defaultTrackList.length - 1)
+          ];
         }
       }
     }
@@ -109,7 +128,7 @@
         }
       } else {
         _log(`unshuffling currently shuffled list`);
-        this.currentTrackList = [...this.defaultTrackList]
+        this.currentTrackList = [...this.defaultTrackList];
       }
       [...this.currentTrackList].forEach((track, idx) => {
         track.currentIndex = idx;
@@ -139,10 +158,10 @@
           artwork: [
             {
               src: `https://i.ytimg.com/vi/${this.VIDEO_ID}/mqdefault.jpg`,
-              sizes: '320x180',
-              type: 'image/jpeg'
-            }
-          ]
+              sizes: "320x180",
+              type: "image/jpeg",
+            },
+          ],
         });
       }
     }
@@ -153,11 +172,19 @@
     seekFromCurrent(offset, event) {
       const NEXT = 1,
         PREVIOUS = -1;
-      _log(`received seek ${offset === PREVIOUS ? "previous" : "next"} command at ${this.videoElement.currentTime}`)
+      _log(
+        `received seek ${
+          offset === PREVIOUS ? "previous" : "next"
+        } command at ${this.videoElement.currentTime}`
+      );
       let now_playing = this.getNowPlaying();
       if (now_playing) {
         // if going in reverse and
-        if (offset === PREVIOUS && this.videoElement.currentTime - now_playing.start > YCMC.TRACK_START_THRESHOLD) {
+        if (
+          offset === PREVIOUS &&
+          this.videoElement.currentTime - now_playing.start >
+            YCMC.TRACK_START_THRESHOLD
+        ) {
           offset = 0;
         }
         let track = this.currentTrackList[now_playing.currentIndex + offset];
@@ -170,7 +197,9 @@
         }
         this.seekTo(track);
       } else {
-        _warn('could not resolve currently playing track, cannot seek relative to it');
+        _warn(
+          "could not resolve currently playing track, cannot seek relative to it"
+        );
       }
     }
 
@@ -181,12 +210,25 @@
       _log(`parsed ${this.defaultTrackList.length} tracks`);
       if (this.defaultTrackList.length) {
         GM_registerMenuCommand("shuffle", this.toggleShuffle.bind(this), "s");
-        this.videoElement = document.querySelector('video');
-        this.channelName = document.querySelector("#player ~ #meta .ytd-channel-name a").textContent.trim();
+        this.videoElement = document.querySelector("video");
+        this.channelName = document
+          .querySelector("#player ~ #meta .ytd-channel-name a")
+          .textContent.trim();
 
-        navigator.mediaSession.setActionHandler('nexttrack', this.seekNext, true);
-        navigator.mediaSession.setActionHandler('previoustrack', this.seekPrevious, true);
-        this.videoElement.addEventListener('timeupdate', this.timeUpdateHandler.bind(this));
+        navigator.mediaSession.setActionHandler(
+          "nexttrack",
+          this.seekNext,
+          true
+        );
+        navigator.mediaSession.setActionHandler(
+          "previoustrack",
+          this.seekPrevious,
+          true
+        );
+        this.videoElement.addEventListener(
+          "timeupdate",
+          this.timeUpdateHandler.bind(this)
+        );
       }
     }
 
@@ -195,10 +237,22 @@
         this.setNowPlaying();
       }
       this.currentTrack = this.currentTrack || this.getNowPlaying();
-      this.nextTrack = this.nextTrack || this.currentTrack && this.defaultTrackList[this.currentTrack.defaultIndex + 1];
-      const curTimeAfterTrackStart = this.currentTrack && this.videoElement.currentTime >= this.currentTrack.start;
-      const curTimeBeforeNextTrackStart = this.currentTrack && (this.nextTrack && this.nextTrack.start > this.videoElement.currentTime) || !this.nextTrack;
-      if (!this.currentTrack || (curTimeAfterTrackStart && curTimeBeforeNextTrackStart)) {
+      this.nextTrack =
+        this.nextTrack ||
+        (this.currentTrack &&
+          this.defaultTrackList[this.currentTrack.defaultIndex + 1]);
+      const curTimeAfterTrackStart =
+        this.currentTrack &&
+        this.videoElement.currentTime >= this.currentTrack.start;
+      const curTimeBeforeNextTrackStart =
+        (this.currentTrack &&
+          this.nextTrack &&
+          this.nextTrack.start > this.videoElement.currentTime) ||
+        !this.nextTrack;
+      if (
+        !this.currentTrack ||
+        (curTimeAfterTrackStart && curTimeBeforeNextTrackStart)
+      ) {
         return;
       }
       if (this.recentlySeeked) {
@@ -206,11 +260,14 @@
         this.recentlySeeked = false;
         return;
       }
-      _log(`currentTime ${this.videoElement.currentTime} out of range !(${this.currentTrack.start} <= ${this.videoElement.currentTime} < ${this.nextTrack.start}), updating track info`);
+      _log(
+        `currentTime ${this.videoElement.currentTime} out of range !(${this.currentTrack.start} <= ${this.videoElement.currentTime} < ${this.nextTrack.start}), updating track info`
+      );
       if (this.shuffleOn) {
         // go to the next track in the shuffled playlist been shuffled
         _log(`shuffle is currently on, retrieving next track`);
-        let next_shuffled_track = this.currentTrackList[this.currentTrack.currentIndex + 1];
+        let next_shuffled_track =
+          this.currentTrackList[this.currentTrack.currentIndex + 1];
         this.seekTo(next_shuffled_track);
       } else {
         // otherwise, just let the player progress automatically
@@ -227,47 +284,60 @@
         if (!this.VIDEO_ID) {
           _log("parsing youtube video ID failed, presuming non-video page");
           window.clearInterval(setupPoller);
-        } else if (document.querySelector("ytd-watch-flexy") && document.querySelector("video")) {
+        } else if (
+          [
+            document.querySelector("ytd-watch-flexy"),
+            document.querySelector("video"),
+            document.querySelector("#description"),
+          ]
+        ) {
           _log("found player, setting up");
           this.setup();
           window.clearInterval(setupPoller);
         }
-
       }, YCMC.PLAYER_SETUP_QUERY_INTERVAL_MS);
     }
 
     hookMediaSessionSetActionHandler() {
       _log(`hooking mediaSession.setActionHandler`);
-      const oSetActionHandler = window.navigator.mediaSession.setActionHandler.bind(window.navigator.mediaSession);
-      navigator.mediaSession.setActionHandler = window.navigator.setActionHandler = (action, handler, friendly) => {
-        if (friendly) {
-          _log(`received friendly setActionHandler call ${action} ${handler}`);
-          return oSetActionHandler(action, handler);
-        }
-        if (action === "nexttrack") {
-          // noinspection EqualityComparisonWithCoercionJS
-          if (this.ogNextHandler != handler) {
-            _log(`set ogNextHandler from ${this.ogNextHandler} to ${handler}`);
+      const oSetActionHandler =
+        window.navigator.mediaSession.setActionHandler.bind(
+          window.navigator.mediaSession
+        );
+      navigator.mediaSession.setActionHandler =
+        window.navigator.setActionHandler = (action, handler, friendly) => {
+          if (friendly) {
+            _log(
+              `received friendly setActionHandler call ${action} ${handler}`
+            );
+            return oSetActionHandler(action, handler);
           }
-          this.ogNextHandler = handler;
-        } else if (action === "previoustrack") {
-          // noinspection EqualityComparisonWithCoercionJS
-          if (this.ogPreviousHandler != handler) {
-            _log(`set ogPreviousHandler from ${this.ogPreviousHandler} to ${handler}`);
+          if (action === "nexttrack") {
+            // noinspection EqualityComparisonWithCoercionJS
+            if (this.ogNextHandler != handler) {
+              _log(
+                `set ogNextHandler from ${this.ogNextHandler} to ${handler}`
+              );
+            }
+            this.ogNextHandler = handler;
+          } else if (action === "previoustrack") {
+            // noinspection EqualityComparisonWithCoercionJS
+            if (this.ogPreviousHandler != handler) {
+              _log(
+                `set ogPreviousHandler from ${this.ogPreviousHandler} to ${handler}`
+              );
+            }
+            this.ogPreviousHandler = handler;
+          } else {
+            return oSetActionHandler(action, handler);
           }
-          this.ogPreviousHandler = handler;
-        } else {
-          return oSetActionHandler(action, handler);
-        }
-      }
+        };
     }
   }
-
 
   function clamp(number, min, max) {
     return Math.min(max, Math.max(number, min));
   }
-
 
   function _log(...args) {
     return console.log(...["%c[YCMC]", "color: green", ...args]);
@@ -277,16 +347,16 @@
     return console.log(...["%c[YCMC]", "color: yellow", ...args]);
   }
 
-
   // https://stackoverflow.com/a/63856062
   function padArrayStart(arr, len, padding) {
-    return Array(len - arr.length).fill(padding).concat(arr);
+    return Array(len - arr.length)
+      .fill(padding)
+      .concat(arr);
   }
 
   let ycmc = new YCMC();
-  ycmc.hookMediaSessionSetActionHandler()
+  ycmc.hookMediaSessionSetActionHandler();
   window.addEventListener("yt-navigate-finish", () => {
-        ycmc.waitToSetup();
+    ycmc.waitToSetup();
   });
-
 })();
