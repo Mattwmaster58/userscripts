@@ -3,7 +3,7 @@
 // @description     Adds support for nexttrack, previoustrack from mediaSession API, as well as shuffle support, for youtube compilation videos with this.currentTrackLists in the description
 // @author          Mattwmaster58 <mattwmaster58@gmail.com>
 // @namespace       Mattwmaster58 Scripts
-// @match           https://www.youtube.com/watch
+// @match           https://www.youtube.com/*
 // @run-at          document-start
 // @grant           GM_registerMenuCommand
 // @version         0.1
@@ -27,17 +27,20 @@
     defaultTrackList;
     currentTrackList;
     videoElement;
+    descriptionElement;
     ogNextHandler;
     ogPreviousHandler;
 
     resetInst() {
       this.recentlySeeked = this.shuffleOn = false;
-      this.VIDEO_ID = location.href.match(
+      this.VIDEO_ID = (location.href.match(
         /(?:youtu\.be\/|youtube\.com(?:\/embed\/|\/v\/|\/watch\?v=|\/user\/\S+|\/ytscreeningroom\?v=|\/sandalsResorts#\w\/\w\/.*\/))([^\/&]{10,12})/
-      )[1];
+      ) || [null, null])[1];
       this.defaultTrackList =
         this.currentTrackList =
         this.videoElement =
+        this.currentTrack =
+        this.nextTrack =
         this.ogNextHandler =
         this.ogPreviousHandler =
           null;
@@ -68,9 +71,10 @@
 
     parseFromAnywhere() {
       let attempts = [];
-      const vidDesc = document.querySelector(
+      this.descriptionElement = document.querySelector(
         "#description yt-formatted-string"
-      ).textContent;
+      );
+      const vidDesc = this.descriptionElement.textContent;
       _log(`attempted parse of YT description`);
       attempts.push(this.parseTextForTimings(vidDesc));
       // todo: make this trigger a comment loading via scroll events?
@@ -105,7 +109,7 @@
 
     getNowPlaying() {
       const cur_time = this.videoElement.currentTime;
-      for (const track of this.defaultTrackList) {
+      for (const track of this.defaultTrackList || []) {
         if (track.start > cur_time) {
           return this.defaultTrackList[
             clamp(track.defaultIndex - 1, 0, this.defaultTrackList.length - 1)
@@ -229,10 +233,15 @@
           "timeupdate",
           this.timeUpdateHandler.bind(this)
         );
+        // in the past we've had a one time listener to update on play
+        // i don't think this is necessary
       }
     }
 
     timeUpdateHandler() {
+      if (!this.defaultTrackList) {
+        return;
+      }
       if (!this.currentTrack && !this.nextTrack) {
         this.setNowPlaying();
       }
@@ -280,19 +289,48 @@
     waitToSetup() {
       this.resetInst();
       _log("waiting for YT Player to load");
-      let setupPoller = window.setInterval(() => {
+      window.setupPoller = window.setInterval(() => {
         if (!this.VIDEO_ID) {
           _log("parsing youtube video ID failed, presuming non-video page");
           window.clearInterval(setupPoller);
-        } else if (
-          [
-            document.querySelector("ytd-watch-flexy"),
-            document.querySelector("video"),
-            document.querySelector("#description"),
-          ]
+          return;
+        }
+        let descriptionElement = document.querySelector(
+          "#description yt-formatted-string"
+        );
+        if (
+          document.querySelector("ytd-watch-flexy") &&
+          descriptionElement &&
+          descriptionElement !== this.descriptionElement &&
+          document.querySelector("video")
         ) {
           _log("found player, setting up");
           this.setup();
+          window.clearInterval(setupPoller);
+        } else if (descriptionElement) {
+          // ie, we have all the elements but aren't confident the page has changed
+          const observer = new MutationObserver((mutationsList, observer) => {
+            if (mutationsList.length > 0) {
+              // typically, takes about 30ms (!!) for the whole list of description span's to be added to the DOM
+              // we triple that for safety: we wait 100ms after a childlist mutation happens
+              // if another childlist mutation happens in that time period,
+              // the current timeout is abandoned and replaced with another 100ms
+              if (window.descMutTimeout) {
+                window.clearTimeout(window.descMutTimeout);
+              }
+              window.descMutTimeout = window.setTimeout(() => {
+                _log("found player + description, setting up");
+                this.setup();
+                window.descMutTimeout = null;
+              }, 100);
+            }
+          });
+          observer.observe(
+            document.querySelector("#description yt-formatted-string"),
+            { childList: true }
+          );
+          // we no longer care about a generic setup poller, watching the description
+          // for changes is more effecient and suffices
           window.clearInterval(setupPoller);
         }
       }, YCMC.PLAYER_SETUP_QUERY_INTERVAL_MS);
@@ -357,6 +395,10 @@
   let ycmc = new YCMC();
   ycmc.hookMediaSessionSetActionHandler();
   window.addEventListener("yt-navigate-finish", () => {
+    if (!/^\/watch/.test(location.pathname)) {
+      _log("nav finished, but not onto watch page, ignoring");
+      return;
+    }
     ycmc.waitToSetup();
   });
 })();
