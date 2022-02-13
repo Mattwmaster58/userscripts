@@ -25,13 +25,17 @@ making it easier to accidentally delete a repo (It's not always easy to get it b
 
 #### Demo
 
-![Demo](./githubQuickDelete_demo.gif)
+![Demo](./demo/githubQuickDelete_demo.gif)
 
 ### ytCompilationMusicControls.user.js [![Install](https://img.shields.io/badge/userscript-install-blue)](https://github.com/Mattwmaster58/userscripts/raw/master/ytCompilationMusicControls.user.js)
 
 Parses a tracklist from a compilation video description to enable usage of media keys to seek tracks within the video (
-ie, the next/prev buttons on your keyboard). The now playing information is also set. Also include a PoC for shuffling
-the tracks in the compilation video.
+ie, the next/prev buttons on your keyboard). The now playing information is also set via the mediaSession API.
+
+#### Demo
+
+![Demo](./demo/ytCompilationMusicControl_demo.mp4)
+[Video](https://www.youtube.com/watch?v=-N-jQzBXkUU) from the demo. The chapter list does not need to be open to use this userscript, it was opened to show the video being seeked around to different chapters. Only the media keys are being pressed. The volume/media flyout is provided by [ModernFlyouts](https://modernflyouts-community.github.io/) that integrates with Windows, not this extension.
 
 ## userstyles
 
