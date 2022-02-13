@@ -40,6 +40,7 @@ ie, the next/prev buttons on your keyboard). The now playing information is also
 
 ## userstyles
 
-### redditCollapseSidebar.user.css
+### redditCollapseSidebar.user.css [![Install](https://img.shields.io/badge/userstyle-install-blue)](https://github.com/Mattwmaster58/userscripts/raw/master/redditCollapseSidebar.user.css)
+
 
 Collapses the sidebar when your screen gets to narrow (configurable)
