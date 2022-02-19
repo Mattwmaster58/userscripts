@@ -38,6 +38,12 @@ ie, the next/prev buttons on your keyboard). The now playing information is also
 
 [Video](https://www.youtube.com/watch?v=-N-jQzBXkUU) watched in the demo. The chapter list does not need to be open to use this userscript, it was opened to show the video being seeked around to different chapters. Only the media keys are being pressed. The volume/media flyout is provided by [ModernFlyouts](https://modernflyouts-community.github.io/) that integrates with Windows, and not related to this extension.
 
+### googlePlayAPKDownload.user.js [![Install](https://img.shields.io/badge/userscript-install-blue)](https://github.com/Mattwmaster58/userscripts/raw/master/googlePlayAPKDownload.user.js)
+
+Adds a button to download the APK from [Evozi](https://apps.evozi.com/apk-downloader/) on the desktop Google Play site
+
+![Demo](./demo/googlePlayAPKDownload_demo.png)
+
 ## userstyles
 
 ### redditCollapseSidebar.user.css [![Install](https://img.shields.io/badge/userstyle-install-blue)](https://github.com/Mattwmaster58/userscripts/raw/master/redditCollapseSidebar.user.css)
