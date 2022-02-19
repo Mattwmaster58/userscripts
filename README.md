@@ -25,7 +25,7 @@ making it easier to accidentally delete a repo (It's not always easy to get it b
 
 #### Demo
 
-![Demo](./demo/githubQuickDelete_demo.gif)
+https://user-images.githubusercontent.com/26337069/154783066-4548df5d-064f-4177-8538-9f7618a828ea.mp4
 
 ### ytCompilationMusicControls.user.js [![Install](https://img.shields.io/badge/userscript-install-blue)](https://github.com/Mattwmaster58/userscripts/raw/master/ytCompilationMusicControls.user.js)
 
@@ -34,7 +34,7 @@ ie, the next/prev buttons on your keyboard). The now playing information is also
 
 #### Demo
 
-![Demo](./demo/ytCompilationMusicControl_demo.gif)
+https://user-images.githubusercontent.com/26337069/154783038-a6b6795b-70b4-409d-bcc3-f03136a71fe1.mp4
 
 [Video](https://www.youtube.com/watch?v=-N-jQzBXkUU) watched in the demo. The chapter list does not need to be open to use this userscript, it was opened to show the video being seeked around to different chapters. Only the media keys are being pressed. The volume/media flyout is provided by [ModernFlyouts](https://modernflyouts-community.github.io/) that integrates with Windows, and not related to this extension.
 
