@@ -25,7 +25,7 @@ making it easier to accidentally delete a repo (It's not always easy to get it b
 
 #### Demo
 
-https://user-images.githubusercontent.com/26337069/154783066-4548df5d-064f-4177-8538-9f7618a828ea.mp4
+https://user-images.githubusercontent.com/26337069/154783949-53f4f0ff-6769-4440-b35a-89015baabfc0.mp4
 
 ### ytCompilationMusicControls.user.js [![Install](https://img.shields.io/badge/userscript-install-blue)](https://github.com/Mattwmaster58/userscripts/raw/master/ytCompilationMusicControls.user.js)
 
