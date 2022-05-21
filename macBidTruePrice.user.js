@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name            mac.bid true price
-// @description     Shows the true price of an item everywhere on the site to better spend your money. Note: assumes worst case tax scenario (7%) when it is sometimes %6
+// @description     Shows the true price of an item everywhere on the site to better spend your money. Note: assumes worst case tax scenario (7%, Allegheny county) when it is sometimes 6%
 // @author          Mattwmaster58 <mattwmaster58@gmail.com>
 // @namespace       Mattwmaster58 Scripts
 // @match           https://*.mac.bid/*
