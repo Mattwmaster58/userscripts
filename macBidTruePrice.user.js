@@ -46,13 +46,16 @@ function processPriceElem(node) {
   if (node.classList.contains(USERSCRIPT_DIRTY) || node.innerText.includes(zeroWidthSpace)) {
     return;
   }
-  node.classList.add(USERSCRIPT_DIRTY);
-  // noinspection JSUnusedLocalSymbols
-  node.innerHTML = node.textContent.replace(/(.*)\$((\d+)(\.\d{2})?)$/i, (_match, precedingText, price, integralPart, fractionalPart) => {
-    // really no reason to show site price if we know the "real" price
-    // return `${precedingText} ~$${Math.round(calculateTruePrice(parseFloat(price)))} <sup>($${integralPart})</sup>`;
-    return `${zeroWidthSpace}${precedingText} $${Math.round(calculateTruePrice(parseFloat(price)))}`;
-  });
+  if (/(.*)\$((\d+)(\.\d{2})?)$/i.test(node.textContent)) {
+    node.classList.add(USERSCRIPT_DIRTY);
+    // noinspection JSUnusedLocalSymbols
+    node.innerHTML = node.textContent.replace(/(.*)\$((\d+)(\.\d{2})?)$/i, (_match, precedingText, price, integralPart, fractionalPart) => {
+      node.title = `true price is active - displayed price was ${price}`;
+      // really no reason to show site price if we know the "real" price
+      // return `${precedingText} ~$${Math.round(calculateTruePrice(parseFloat(price)))} <sup>($${integralPart})</sup>`;
+      return `${zeroWidthSpace}${precedingText} $${Math.round(calculateTruePrice(parseFloat(price)))}`;
+    });
+  }
 }
 
 
@@ -95,7 +98,7 @@ const mutationInstance = new MutationObserver((mutations) => {
     for (const elem of matchingElems) {
       processPriceElem(elem);
     }
-  }, 0);
+  }, 100);
 });
 
 mutationInstance.observe(document.body, {
