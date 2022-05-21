@@ -42,26 +42,22 @@ function xPathClass(className) {
 
 function processPriceElem(node) {
   // this is required even tho our xpath should avoid this, i suspect due to async nature of mutation observer
-  if (node.classList.contains(USERSCRIPT_DIRTY)) {
+  if (node.classList.contains(USERSCRIPT_DIRTY) || node.innerText.includes("~")) {
     return;
   }
   node.classList.add(USERSCRIPT_DIRTY);
-  node.innerHTML = node.textContent.replace(/(.*)\$(\d+(\.\d{2})?)$/i, (_match, precedingText, price, priceDecimals, _offset, inputString) => {
+  node.innerHTML = node.textContent.replace(/(.*)\$((\d+)(\.\d{2})?)$/i, (_match, precedingText, price, integralPart, fractionalPart, _offset, inputString) => {
     // maybe in the future, we replace this completely, but for now show og price for debugging aid
-    if (priceDecimals) {
-      return `${precedingText} ~$${round(calculateTruePrice(parseFloat(price)))} <sup>$${price}</sup>`;
-    } else {
-      return `${precedingText} ~$${Math.round(calculateTruePrice(parseFloat(price)))} <sup>$${price}</sup>`;
-    }
+    return `${precedingText} ~$${Math.round(calculateTruePrice(parseFloat(price)))} <sup>($${integralPart})</sup>`;
   });
 }
 
 
 const mutationInstance = new MutationObserver((mutations) => {
   const USERSCRIPT_DIRTY_CLASS_SELECTOR = `[not(contains(concat(" ",normalize-space(@class)," ")," ${USERSCRIPT_DIRTY} "))]`;
-  const matchingElems = mutations.map((rec) => {
-    rec.addedNodes
-  }).flat()
+  const matchingElems = mutations
+    .map((rec) => Array.from(rec.addedNodes))
+    .flat()
     .map((element) => {
       // the xpathClass btn are necessary because those are added later, otherwise we're operating on old elements
       return xPathEval(
@@ -76,14 +72,16 @@ const mutationInstance = new MutationObserver((mutations) => {
           `.//select/option${USERSCRIPT_DIRTY_CLASS_SELECTOR}`
         ].join(" | ")
         , element);
-    }).flat();
-  for (const elem of matchingElems) {
+    }).flat()
+  setTimeout(() => {
+    for (const elem of matchingElems) {
       processPriceElem(elem);
-  }
+    }
+  }, 10);
 });
 
 mutationInstance.observe(document, {
-  subtree: true,
   childList: true,
+  subtree: true
 });
 
