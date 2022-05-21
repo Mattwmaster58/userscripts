@@ -42,7 +42,8 @@ function xPathClass(className) {
 
 function processPriceElem(node) {
   // this is required even tho our xpath should avoid this, i suspect due to async nature of mutation observer
-  if (node.classList.contains(USERSCRIPT_DIRTY) || node.innerText.includes("~")) {
+  const zeroWidthSpace = '​';
+  if (node.classList.contains(USERSCRIPT_DIRTY) || node.innerText.includes(zeroWidthSpace)) {
     return;
   }
   node.classList.add(USERSCRIPT_DIRTY);
@@ -50,31 +51,43 @@ function processPriceElem(node) {
   node.innerHTML = node.textContent.replace(/(.*)\$((\d+)(\.\d{2})?)$/i, (_match, precedingText, price, integralPart, fractionalPart) => {
     // really no reason to show site price if we know the "real" price
     // return `${precedingText} ~$${Math.round(calculateTruePrice(parseFloat(price)))} <sup>($${integralPart})</sup>`;
-    return `${precedingText} $${Math.round(calculateTruePrice(parseFloat(price)))}`;
+    return `${zeroWidthSpace}${precedingText} $${Math.round(calculateTruePrice(parseFloat(price)))}`;
   });
 }
 
 
 const mutationInstance = new MutationObserver((mutations) => {
   const USERSCRIPT_DIRTY_CLASS_SELECTOR = `[not(contains(concat(" ",normalize-space(@class)," ")," ${USERSCRIPT_DIRTY} "))]`;
+  let xPathEvalCallback = (element) => {
+    // the xpathClass btn are necessary because those are added later, otherwise we're operating on old elements
+    return xPathEval(
+      [
+        // current bid, green buttons
+        `.//a${USERSCRIPT_DIRTY_CLASS_SELECTOR}${xPathClass("btn")}[starts-with(., 'Current Bid')]`,
+        // current bid, green buttons (yes, theres almost 2 of the exact same ones here
+        `.//div${USERSCRIPT_DIRTY_CLASS_SELECTOR}${xPathClass("btn")}[starts-with(., 'Current Bid')]`,
+        // bid page model, big price
+        `.//div${xPathClass("h1")}/span${USERSCRIPT_DIRTY_CLASS_SELECTOR}`,
+        // bid amount dropdown
+        `.//select/option${USERSCRIPT_DIRTY_CLASS_SELECTOR}`
+      ].join(" | ")
+      , element);
+  };
+  let targetsModified = new Set();
+
   const matchingElems = mutations
-    .map((rec) => Array.from(rec.addedNodes))
+    .map((rec) => {
+      if (rec.addedNodes.length === 0) {
+        targetsModified.add(rec.target);
+      }
+      return Array.from(rec.addedNodes)
+    })
     .flat()
-    .map((element) => {
-      // the xpathClass btn are necessary because those are added later, otherwise we're operating on old elements
-      return xPathEval(
-        [
-          // current bid, green buttons
-          `.//a${USERSCRIPT_DIRTY_CLASS_SELECTOR}${xPathClass("btn")}[starts-with(., 'Current Bid')]`,
-          // current bid, green buttons (yes, theres almost 2 of the exact same ones here
-          `.//div${USERSCRIPT_DIRTY_CLASS_SELECTOR}${xPathClass("btn")}[starts-with(., 'Current Bid')]`,
-          // bid page model, big price
-          `.//div${xPathClass("h1")}/span${USERSCRIPT_DIRTY_CLASS_SELECTOR}`,
-          // bid amount dropdown
-          `.//select/option${USERSCRIPT_DIRTY_CLASS_SELECTOR}`
-        ].join(" | ")
-        , element);
-    }).flat()
+    .map(xPathEvalCallback).flat()
+
+  if (targetsModified.size > 0) {
+    matchingElems.push(...xPathEvalCallback(document.body));
+  }
   // if we try to modify the nodes right away, we get some weird react errors
   // so instead, we use setTimeout(..., 0) to yield to the async event loop, letting react do its react things
   // and immediately executing this when react is done doing its things
@@ -85,7 +98,7 @@ const mutationInstance = new MutationObserver((mutations) => {
   }, 0);
 });
 
-mutationInstance.observe(document, {
+mutationInstance.observe(document.body, {
   childList: true,
   subtree: true
 });
