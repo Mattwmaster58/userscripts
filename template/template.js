@@ -6,7 +6,3 @@
 // @match           http://*.example.com/*
 // @version         0.1
 // ==/UserScript==
-
-(function () {
-
-})();
