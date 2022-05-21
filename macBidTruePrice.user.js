@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name            mac.bid true price
-// @description     Shows the true price of an item everywhere on the site to better spend your money
+// @description     Shows the true price of an item everywhere on the site to better spend your money. Note: assumes worst case tax scenario (7%) when it is sometimes %6
 // @author          Mattwmaster58 <mattwmaster58@gmail.com>
 // @namespace       Mattwmaster58 Scripts
 // @match           https://*.mac.bid/*
-// @version         0.1
+// @version         0.2
 // ==/UserScript==
 
 const USERSCRIPT_DIRTY = "userscript-dirty";
@@ -46,9 +46,11 @@ function processPriceElem(node) {
     return;
   }
   node.classList.add(USERSCRIPT_DIRTY);
-  node.innerHTML = node.textContent.replace(/(.*)\$((\d+)(\.\d{2})?)$/i, (_match, precedingText, price, integralPart, fractionalPart, _offset, inputString) => {
-    // maybe in the future, we replace this completely, but for now show og price for debugging aid
-    return `${precedingText} ~$${Math.round(calculateTruePrice(parseFloat(price)))} <sup>($${integralPart})</sup>`;
+  // noinspection JSUnusedLocalSymbols
+  node.innerHTML = node.textContent.replace(/(.*)\$((\d+)(\.\d{2})?)$/i, (_match, precedingText, price, integralPart, fractionalPart) => {
+    // really no reason to show site price if we know the "real" price
+    // return `${precedingText} ~$${Math.round(calculateTruePrice(parseFloat(price)))} <sup>($${integralPart})</sup>`;
+    return `${precedingText} $${Math.round(calculateTruePrice(parseFloat(price)))}`;
   });
 }
 
@@ -73,11 +75,14 @@ const mutationInstance = new MutationObserver((mutations) => {
         ].join(" | ")
         , element);
     }).flat()
+  // if we try to modify the nodes right away, we get some weird react errors
+  // so instead, we use setTimeout(..., 0) to yield to the async event loop, letting react do its react things
+  // and immediately executing this when react is done doing its things
   setTimeout(() => {
     for (const elem of matchingElems) {
       processPriceElem(elem);
     }
-  }, 10);
+  }, 0);
 });
 
 mutationInstance.observe(document, {
