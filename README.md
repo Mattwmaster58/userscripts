@@ -46,7 +46,7 @@ Adds a button to download the APK from [Evozi](https://apps.evozi.com/apk-downlo
 
 #### macBidTruePrice.user.js [![Install](https://img.shields.io/badge/userscript-install-blue)](https://github.com/Mattwmaster58/userscripts/raw/master/macBidTruePrice.user.js)
 
-Shows the true price of items on [mac.bid](https://mac.bid), including buyers premium, lot fee, and sales tax, which can add up quickly.
+Shows the true price of items on [mac.bid](https://mac.bid), including buyers premium, lot fee, and sales tax which can add up quickly in almost every place on the site.
 ![Demo](./demo/macBidTruePrice_demo.png)
 
 ## userstyles
