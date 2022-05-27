@@ -7,7 +7,18 @@
 // @version         0.2
 // ==/UserScript==
 
-const USERSCRIPT_DIRTY = "userscript-dirty";
+const USERSCRIPT_DIRTY_CLASS = "userscript-dirty";
+const USERSCRIPT_DIRTY_CLASS_SELECTOR = `[not(contains(concat(" ",normalize-space(@class)," ")," ${USERSCRIPT_DIRTY_CLASS} "))]`;
+const NO_BIDS_CLASS = "userscript-no-bids";
+const NO_BIDS_CSS = `
+.${NO_BIDS_CLASS} {
+  background-color: #0061a5;
+}
+
+span.${NO_BIDS_CLASS} {
+  color: gray;
+}
+`
 
 function xPathEval(path, node) {
   const res = document.evaluate(path, node || document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
@@ -43,11 +54,11 @@ function xPathClass(className) {
 function processPriceElem(node) {
   // this is required even tho our xpath should avoid this, i suspect due to async nature of mutation observer
   const zeroWidthSpace = '​';
-  if (node.classList.contains(USERSCRIPT_DIRTY) || node.innerText.includes(zeroWidthSpace)) {
+  if (node.classList.contains(USERSCRIPT_DIRTY_CLASS) || node.innerText.includes(zeroWidthSpace)) {
     return;
   }
   if (/(.*)\$((\d+)(\.\d{2})?)$/i.test(node.textContent)) {
-    node.classList.add(USERSCRIPT_DIRTY);
+    node.classList.add(USERSCRIPT_DIRTY_CLASS);
     // noinspection JSUnusedLocalSymbols
     node.innerHTML = node.textContent.replace(/(.*)\$((\d+)(\.\d{2})?)$/i, (_match, precedingText, price, integralPart, fractionalPart) => {
       node.title = `true price is active - displayed price was ${price}`;
@@ -59,34 +70,37 @@ function processPriceElem(node) {
 }
 
 
-const mutationInstance = new MutationObserver((mutations) => {
-  const USERSCRIPT_DIRTY_CLASS_SELECTOR = `[not(contains(concat(" ",normalize-space(@class)," ")," ${USERSCRIPT_DIRTY} "))]`;
+const truePriceMutationObserver = new MutationObserver((mutations) => {
+  const USERSCRIPT_NOT_DIRTY_CLASS_SELECTOR = `[not(contains(concat(" ",normalize-space(@class)," ")," ${USERSCRIPT_DIRTY_CLASS} "))]`;
   let xPathEvalCallback = (element) => {
     // the xpathClass btn are necessary because those are added later, otherwise we're operating on old elements
     return xPathEval(
       [
         // current bid, green buttons
-        `.//a${USERSCRIPT_DIRTY_CLASS_SELECTOR}${xPathClass("btn")}[starts-with(., 'Current Bid')]`,
+        `.//a${xPathClass("btn")}${USERSCRIPT_NOT_DIRTY_CLASS_SELECTOR}[starts-with(., 'Current Bid')]`,
         // current bid, green buttons (yes, theres almost 2 of the exact same ones here
-        `.//div${USERSCRIPT_DIRTY_CLASS_SELECTOR}${xPathClass("btn")}[starts-with(., 'Current Bid')]`,
+        `.//div${xPathClass("btn")}${USERSCRIPT_NOT_DIRTY_CLASS_SELECTOR}[starts-with(., 'Current Bid')]`,
         // bid page model, big price
-        `.//div${xPathClass("h1")}/span${USERSCRIPT_DIRTY_CLASS_SELECTOR}`,
+        `.//div${xPathClass("h1")}/span${USERSCRIPT_NOT_DIRTY_CLASS_SELECTOR}`,
         // bid amount dropdown
-        `.//select/option${USERSCRIPT_DIRTY_CLASS_SELECTOR}`
+        `.//select/option${USERSCRIPT_NOT_DIRTY_CLASS_SELECTOR}`,
+        // status indicator when you have highest bid
+        `.//p${xPathClass("alert")}[starts-with(., \" YOU'RE WINNING \")]`,
       ].join(" | ")
       , element);
   };
   let targetsModified = new Set();
 
-  const matchingElems = mutations
-    .map((rec) => {
-      if (rec.addedNodes.length === 0) {
-        targetsModified.add(rec.target);
-      }
-      return Array.from(rec.addedNodes)
-    })
-    .flat()
-    .map(xPathEvalCallback).flat()
+  const matchingElems =
+    mutations
+      .map((rec) => {
+        if (rec.addedNodes.length === 0) {
+          targetsModified.add(rec.target);
+        }
+        return Array.from(rec.addedNodes)
+      })
+      .flat()
+      .map(xPathEvalCallback).flat()
 
   if (targetsModified.size > 0) {
     matchingElems.push(...xPathEvalCallback(document.body));
@@ -98,11 +112,78 @@ const mutationInstance = new MutationObserver((mutations) => {
     for (const elem of matchingElems) {
       processPriceElem(elem);
     }
-  }, 100);
+  }, 0);
 });
 
-mutationInstance.observe(document.body, {
+function secondsFromTimeLeft(timeLeftStr) {
+  const conversions = Object.values({
+    day: 60 * 60 * 24,
+    hour: 60 * 60,
+    minute: 60,
+    second: 1,
+  });
+
+  return /(\d{1,2})d(\d{1,2})h(\d{1,2})m(\d{1,2})s/i
+    .exec(timeLeftStr)
+    .slice(1)
+    .map(parseFloat)
+    .map((num, idx) => Object.values(conversions)[idx] * num)
+    .reduce((a, b) => a + b);
+}
+
+function tabTitle(prefix, suffix) {
+  // gets an appropriate tab title based on url
+  prefix = prefix || "";
+  suffix = suffix || "";
+  if (location.pathname === "/account/watchlist") {
+    return `${prefix} - Watchlist ${suffix}`;
+  } else if (/\/auction\/.*\/lot\/\d+/.test(location.pathname)) {
+    const itemTitle = document.querySelector(".page-title-overlap h1").textContent;
+    return `${prefix} - ${itemTitle} ${suffix}`;
+  } else {
+    return `${prefix} mac.bid ${suffix}`;
+  }
+}
+
+const minTimeSentinel = 10 ** 10;
+let minTime = minTimeSentinel;
+
+const remainingTimeMutationObserver = new MutationObserver((mutations) => {
+  // or anywhere there's a countdown?
+  let minTimeText = "";
+  if (location.pathname === "/account/watchlist" || /\/auction\/.*\/lot\/\d+/.test(location.pathname)) {
+    mutations
+      .map((mut) => {
+        const parent = mut.target.parentElement.parentElement.parentElement;
+        if (Array.from(parent.classList).includes("cz-countdown")) {
+          let m;
+          if ((m = secondsFromTimeLeft(parent.textContent)) < minTime) {
+            minTime = m;
+            // we would like to see the two most significant digits
+            // eg: 2d19h7m11s → 2d19h
+            minTimeText = /^(?:0[dhms])*((?:[1-9]\d?[dhms]){1,2})/i.exec(parent.textContent)[1];
+            document.title = tabTitle(minTimeText);
+          }
+        }
+      });
+
+    // todo: theoretically handles the handover on the *next* cycle of text change instead of instantly
+    if (minTime === 0) {
+      // if minTime is 0, the auction has ended and will be removed imminently
+      // this means that there should be a longer item on the wl,
+      // let it naturally take over in the course of the loop
+      minTime = minTimeSentinel;
+    }
+  }
+});
+
+truePriceMutationObserver.observe(document.body, {
   childList: true,
   subtree: true
+});
+
+remainingTimeMutationObserver.observe(document.body, {
+  subtree: true,
+  characterData: true,
 });
 
