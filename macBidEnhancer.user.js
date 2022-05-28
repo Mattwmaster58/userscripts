@@ -67,7 +67,7 @@ const onUrlChange = (state, title, url) => {
       return part.charAt(0).toUpperCase() + part.slice(1);
     }).join(" ");
   }
-  _log(`changing title from ${document.title} to ${newTitle}`);
+  _log(`changing title from "${document.title}" to "${newTitle}"`);
   document.title = newTitle;
 }
 
