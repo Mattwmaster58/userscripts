@@ -4,8 +4,66 @@
 // @author          Mattwmaster58 <mattwmaster58@gmail.com>
 // @namespace       Mattwmaster58 Scripts
 // @match           https://*.mac.bid/*
-// @version         0.2
+// @version         0.3
+// @run-at          document-start
 // ==/UserScript==
+
+function _log(...args) {
+  return console.log(...["%c[MBE]", "color: green", ...args]);
+}
+
+function _warn(...args) {
+  return console.log(...["%c[MBE]", "color: yellow", ...args]);
+}
+
+function _debug(...args) {
+  return console.log(...["%c[MBE]", "color: green", ...args]);
+}
+
+
+const onChangeState = (state, title, url) => {
+  _log(state, title, url);
+  const urlExceptions = [
+    [/\/account\/invoices\/\d+/, (url) => {
+      return `Invoice ${url.split("/").at(-1)}`;
+    }],
+    [/\/account\/active/, () => "Awaiting Pickup"],
+
+  ]
+  let urlExcepted = false;
+  let newTitle;
+  for (const [re, func] of urlExceptions) {
+    if (re.test(url)) {
+      newTitle = func(url);
+      urlExcepted = true;
+      break;
+    }
+  }
+  if (!urlExcepted) {
+    newTitle = /\/(?:.*\/)*([\w-]+)/.exec(url)[1].split("-").map((part) => {
+      return part.charAt(0).toUpperCase() + part.slice(1);
+    }).join(" ");
+  }
+  _log(`changing title from ${document.title} to ${newTitle}`);
+  document.title = newTitle;
+}
+
+// set onChangeState() listener:
+['pushState', 'replaceState'].forEach((changeState) => {
+  // store original values under underscored keys (`window.history._pushState()` and `window.history._replaceState()`):
+  window.history['_' + changeState] = window.history[changeState];
+  window.history[changeState] = new Proxy(window.history[changeState], {
+    apply(target, thisArg, argList) {
+      const [state, title, url] = argList;
+      try {
+        onChangeState(state, title, url);
+      } catch (e) {
+        console.error(e);
+      }
+      return target.apply(thisArg, argList)
+    },
+  })
+});
 
 const USERSCRIPT_DIRTY_CLASS = "userscript-dirty";
 const USERSCRIPT_DIRTY_CLASS_SELECTOR = `[not(contains(concat(" ",normalize-space(@class)," ")," ${USERSCRIPT_DIRTY_CLASS} "))]`;
@@ -177,13 +235,25 @@ const remainingTimeMutationObserver = new MutationObserver((mutations) => {
   }
 });
 
-truePriceMutationObserver.observe(document.body, {
-  childList: true,
-  subtree: true
+
+const bodyObserver = new MutationObserver(function () {
+  if (document.body) {
+    _log("document.body found, attaching mutation observers");
+    truePriceMutationObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+    remainingTimeMutationObserver.observe(document.body, {
+      subtree: true,
+      characterData: true,
+    });
+    bodyObserver.disconnect();
+    // sets the title on initial page load
+    onChangeState(null, document.title, location.pathname);
+  }
 });
 
-remainingTimeMutationObserver.observe(document.body, {
-  subtree: true,
-  characterData: true,
-});
+bodyObserver.observe(document.documentElement, {childList: true});
+
+
 
