@@ -21,15 +21,38 @@ function _debug(...args) {
 }
 
 
-const onChangeState = (state, title, url) => {
+const onUrlChange = (state, title, url) => {
   _log(state, title, url);
   const urlExceptions = [
-    [/\/account\/invoices\/\d+/, (url) => {
-      return `Invoice ${url.split("/").at(-1)}`;
-    }],
-    [/\/account\/active/, () => "Awaiting Pickup"],
-
+      [/\/account\/invoices\/\d+/, (url) =>
+        `Invoice ${url.split("/").at(-1)}`
+      ],
+      [/\/account\/active/, () => "Awaiting Pickup"],
+      // sometimes works, sometimes doesn't. Idk what's going on
+      [/\/search\?q=.*/, () =>
+        `Search ${new URLSearchParams(location.search).get("q")}`
+      ]
+    ]
+  ;
+  const noPricePages = [
+    // pages that have no prices on them, thus no true price observation is necessary
+    "/account/active",
+    "/account/invoices",
+    "/account/profile",
+    "/account/membership",
+    "/account/payment-method",
   ]
+  let activatePrices = true;
+  for (const urlPrefix of noPricePages) {
+    if (url.startsWith(urlPrefix)) {
+      activatePrices = false;
+      deactivateTruePriceObservers();
+      break;
+    }
+  }
+  if (activatePrices) {
+    activateTruePriceObservers();
+  }
   let urlExcepted = false;
   let newTitle;
   for (const [re, func] of urlExceptions) {
@@ -56,7 +79,7 @@ const onChangeState = (state, title, url) => {
     apply(target, thisArg, argList) {
       const [state, title, url] = argList;
       try {
-        onChangeState(state, title, url);
+        onUrlChange(state, title, url);
       } catch (e) {
         console.error(e);
       }
@@ -239,6 +262,18 @@ const remainingTimeMutationObserver = new MutationObserver((mutations) => {
 const bodyObserver = new MutationObserver(function () {
   if (document.body) {
     _log("document.body found, attaching mutation observers");
+    activateTruePriceObservers();
+    bodyObserver.disconnect();
+    // sets the title on initial page load
+    onUrlChange(null, document.title, location.pathname);
+  }
+});
+
+let CONNECTED = false;
+
+function activateTruePriceObservers() {
+  _debug(`CONNECTED: ${CONNECTED}, activating if necessary`);
+  if (!CONNECTED) {
     truePriceMutationObserver.observe(document.body, {
       childList: true,
       subtree: true
@@ -247,11 +282,18 @@ const bodyObserver = new MutationObserver(function () {
       subtree: true,
       characterData: true,
     });
-    bodyObserver.disconnect();
-    // sets the title on initial page load
-    onChangeState(null, document.title, location.pathname);
+    CONNECTED = true;
   }
-});
+}
+
+function deactivateTruePriceObservers() {
+  _debug(`CONNECTED: ${CONNECTED}, deactivating if necessary`);
+  if (CONNECTED) {
+    truePriceMutationObserver.disconnect();
+    remainingTimeMutationObserver.disconnect();
+    CONNECTED = false;
+  }
+}
 
 bodyObserver.observe(document.documentElement, {childList: true});
 
