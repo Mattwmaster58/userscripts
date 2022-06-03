@@ -4,7 +4,7 @@
 // @author          Mattwmaster58 <mattwmaster58@gmail.com>
 // @namespace       Mattwmaster58 Scripts
 // @match           https://*.mac.bid/*
-// @version         0.3
+// @version         0.3.1
 // @run-at          document-start
 // ==/UserScript==
 
@@ -167,6 +167,8 @@ const truePriceMutationObserver = new MutationObserver((mutations) => {
         `.//select/option${USERSCRIPT_NOT_DIRTY_CLASS_SELECTOR}`,
         // status indicator when you have highest bid
         `.//p${xPathClass("alert")}[starts-with(., \" YOU'RE WINNING \")]`,
+        // different status indicator that uses slightly different wording
+        `.//p${xPathClass("alert")}[starts-with(., \" You are WINNING \")]`,
       ].join(" | ")
       , element);
   };
