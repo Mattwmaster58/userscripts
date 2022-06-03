@@ -4,7 +4,7 @@
 // @author          Mattwmaster58 <mattwmaster58@gmail.com>
 // @namespace       Mattwmaster58 Scripts
 // @match           https://*.mac.bid/*
-// @version         0.3.1
+// @version         0.3.2
 // @run-at          document-start
 // ==/UserScript==
 
@@ -71,7 +71,7 @@ const onUrlChange = (state, title, url) => {
   document.title = newTitle;
 }
 
-// set onChangeState() listener:
+// set onUrlChange proxy
 ['pushState', 'replaceState'].forEach((changeState) => {
   // store original values under underscored keys (`window.history._pushState()` and `window.history._replaceState()`):
   window.history['_' + changeState] = window.history[changeState];
@@ -89,7 +89,6 @@ const onUrlChange = (state, title, url) => {
 });
 
 const USERSCRIPT_DIRTY_CLASS = "userscript-dirty";
-const USERSCRIPT_DIRTY_CLASS_SELECTOR = `[not(contains(concat(" ",normalize-space(@class)," ")," ${USERSCRIPT_DIRTY_CLASS} "))]`;
 const NO_BIDS_CLASS = "userscript-no-bids";
 const NO_BIDS_CSS = `
 .${NO_BIDS_CLASS} {
@@ -169,6 +168,8 @@ const truePriceMutationObserver = new MutationObserver((mutations) => {
         `.//p${xPathClass("alert")}[starts-with(., \" YOU'RE WINNING \")]`,
         // different status indicator that uses slightly different wording
         `.//p${xPathClass("alert")}[starts-with(., \" You are WINNING \")]`,
+        // popup notification telling you you bid
+        `.//div${xPathClass("notification__title")}`,
       ].join(" | ")
       , element);
   };
