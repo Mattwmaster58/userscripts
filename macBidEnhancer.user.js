@@ -24,16 +24,16 @@ function _debug(...args) {
 const onUrlChange = (state, title, url) => {
   _log(state, title, url);
   const urlExceptions = [
-      [/\/account\/invoices\/\d+/, (url) =>
-        `Invoice ${url.split("/").at(-1)}`
-      ],
-      [/\/account\/active/, () => "Awaiting Pickup"],
-      // sometimes works, sometimes doesn't. Idk what's going on
-      [/\/search\?q=.*/, () =>
-        `Search ${new URLSearchParams(location.search).get("q")}`
-      ]
+    [/\/account\/invoices\/\d+/, (url) =>
+      `Invoice ${url.split("/").at(-1)}`
+    ],
+    [/\/account\/active/, () => "Awaiting Pickup"],
+    // sometimes works, sometimes doesn't. Idk what's going on
+    [/\/search\?q=.*/, () =>
+      `Search ${new URLSearchParams(location.search).get("q")}`
     ]
-  ;
+  ]
+    ;
   const noPricePages = [
     // pages that have no prices on them, thus no true price observation is necessary
     "/account/active",
@@ -46,12 +46,17 @@ const onUrlChange = (state, title, url) => {
   for (const urlPrefix of noPricePages) {
     if (url.startsWith(urlPrefix)) {
       activatePrices = false;
-      deactivateTruePriceObservers();
+      observers.deactivateTruePriceObserver();
       break;
     }
   }
   if (activatePrices) {
-    activateTruePriceObservers();
+    observers.activateTruePriceObserver();
+  }
+  // special case listeners to add up invoices
+  // todo: generalize this behaviour?
+  else if (url === "/accounts/invoices") {
+    observers.activateInvoiceObserver();
   }
   let urlExcepted = false;
   let newTitle;
@@ -150,54 +155,6 @@ function processPriceElem(node) {
 }
 
 
-const truePriceMutationObserver = new MutationObserver((mutations) => {
-  const USERSCRIPT_NOT_DIRTY_CLASS_SELECTOR = `[not(contains(concat(" ",normalize-space(@class)," ")," ${USERSCRIPT_DIRTY_CLASS} "))]`;
-  let xPathEvalCallback = (element) => {
-    // the xpathClass btn are necessary because those are added later, otherwise we're operating on old elements
-    return xPathEval(
-      [
-        // current bid, green buttons
-        `.//a${xPathClass("btn")}${USERSCRIPT_NOT_DIRTY_CLASS_SELECTOR}[starts-with(., 'Current Bid')]`,
-        // current bid, green buttons (yes, theres almost 2 of the exact same ones here
-        `.//div${xPathClass("btn")}${USERSCRIPT_NOT_DIRTY_CLASS_SELECTOR}[starts-with(., 'Current Bid')]`,
-        // bid page model, big price
-        `.//div${xPathClass("h1")}/span${USERSCRIPT_NOT_DIRTY_CLASS_SELECTOR}`,
-        // bid amount dropdown
-        `.//select/option${USERSCRIPT_NOT_DIRTY_CLASS_SELECTOR}`,
-        // status indicator when you have highest bid
-        `.//p${xPathClass("alert")}[starts-with(., \" YOU'RE WINNING \")]`,
-        // different status indicator that uses slightly different wording
-        `.//p${xPathClass("alert")}[starts-with(., \" You are WINNING \")]`,
-        // popup notification telling you you bid
-        `.//div${xPathClass("notification__title")}`,
-      ].join(" | ")
-      , element);
-  };
-  let targetsModified = new Set();
-
-  const matchingElems =
-    mutations
-      .map((rec) => {
-        if (rec.addedNodes.length === 0) {
-          targetsModified.add(rec.target);
-        }
-        return Array.from(rec.addedNodes)
-      })
-      .flat()
-      .map(xPathEvalCallback).flat()
-
-  if (targetsModified.size > 0) {
-    matchingElems.push(...xPathEvalCallback(document.body));
-  }
-  // if we try to modify the nodes right away, we get some weird react errors
-  // so instead, we use setTimeout(..., 0) to yield to the async event loop, letting react do its react things
-  // and immediately executing this when react is done doing its things
-  setTimeout(() => {
-    for (const elem of matchingElems) {
-      processPriceElem(elem);
-    }
-  }, 0);
-});
 
 function secondsFromTimeLeft(timeLeftStr) {
   const conversions = Object.values({
@@ -232,73 +189,154 @@ function tabTitle(prefix, suffix) {
 const minTimeSentinel = 10 ** 10;
 let minTime = minTimeSentinel;
 
-const remainingTimeMutationObserver = new MutationObserver((mutations) => {
-  // or anywhere there's a countdown?
-  let minTimeText = "";
-  if (location.pathname === "/account/watchlist" || /\/auction\/.*\/lot\/\d+/.test(location.pathname)) {
-    mutations
-      .map((mut) => {
-        const parent = mut.target.parentElement.parentElement.parentElement;
-        if (Array.from(parent.classList).includes("cz-countdown")) {
-          let m;
-          if ((m = secondsFromTimeLeft(parent.textContent)) < minTime) {
-            minTime = m;
-            // we would like to see the two most significant digits
-            // eg: 2d19h7m11s → 2d19h
-            minTimeText = /^(?:0[dhms])*((?:[1-9]\d?[dhms]){1,2})/i.exec(parent.textContent)[1];
-            document.title = tabTitle(minTimeText);
-          }
-        }
-      });
 
-    // todo: theoretically handles the handover on the *next* cycle of text change instead of instantly
-    if (minTime === 0) {
-      // if minTime is 0, the auction has ended and will be removed imminently
-      // this means that there should be a longer item on the wl,
-      // let it naturally take over in the course of the loop
-      minTime = minTimeSentinel;
+
+
+
+const observers = (() => {
+  // note: hacky naming convention scheme ahead ;)
+  let truePriceActive = false;
+  let remainingTimeActive = false;
+  let invoiceActive = false;
+
+  const configs = {
+    truePrice: { childList: true, subtree: true },
+    remainingTime: { characterData: true, subtree: true },
+    invoice: {},
+  }
+
+  function setObserver(key, state) {
+    const stateKey = `${key}Active`;
+    const mutationObserverKey = `${key}MutationObserver`;
+    _debug(`${key}=${observers[stateKey]}, setting to ${state}`);
+    if (observers[stateKey] !== state) {
+      observers[stateKey] = state;
+      if (state) {
+        observers[mutationObserverKey].observe(configs[key]);
+      } else {
+        observers[mutationObserverKey].disconnect();
+      }
     }
   }
-});
 
-
-const bodyObserver = new MutationObserver(function () {
-  if (document.body) {
-    _log("document.body found, attaching mutation observers");
-    activateTruePriceObservers();
-    bodyObserver.disconnect();
-    // sets the title on initial page load
-    onUrlChange(null, document.title, location.pathname);
+  function activateTruePriceObserver() {
+    setObserver("truePrice", true);
+    setObserver("remainingTime", true);
   }
-});
 
-let CONNECTED = false;
-
-function activateTruePriceObservers() {
-  _debug(`CONNECTED: ${CONNECTED}, activating if necessary`);
-  if (!CONNECTED) {
-    truePriceMutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-    remainingTimeMutationObserver.observe(document.body, {
-      subtree: true,
-      characterData: true,
-    });
-    CONNECTED = true;
+  function deactivateTruePriceObserver() {
+    setObserver("truePrice", false);
+    setObserver("remainingTime", false);
   }
-}
 
-function deactivateTruePriceObservers() {
-  _debug(`CONNECTED: ${CONNECTED}, deactivating if necessary`);
-  if (CONNECTED) {
-    truePriceMutationObserver.disconnect();
-    remainingTimeMutationObserver.disconnect();
-    CONNECTED = false;
-  }
-}
+  function activateInvoiceObserver() { setObserver("invoice", true); }
+  function deactivateInvoiceObserver() { setObserver("invoice", false); }
 
-bodyObserver.observe(document.documentElement, {childList: true});
+  const remainingTimeMutationObserver = new MutationObserver((mutations) => {
+    // or anywhere there's a countdown?
+    // remark: i think this covers 99% of where it's useful already AFAICT
+    let minTimeText = "";
+    if (location.pathname === "/account/watchlist" || /\/auction\/.*\/lot\/\d+/.test(location.pathname)) {
+      mutations
+        .map((mut) => {
+          const parent = mut.target.parentElement.parentElement.parentElement;
+          if (Array.from(parent.classList).includes("cz-countdown")) {
+            let m;
+            if ((m = secondsFromTimeLeft(parent.textContent)) < minTime) {
+              minTime = m;
+              // we would like to see the two most significant digits
+              // eg: 2d19h7m11s → 2d19h
+              minTimeText = /^(?:0[dhms])*((?:[1-9]\d?[dhms]){1,2})/i.exec(parent.textContent)[1];
+              document.title = tabTitle(minTimeText);
+            }
+          }
+        });
+
+      // todo: theoretically handles the handover on the *next* cycle of text change instead of instantly
+      if (minTime === 0) {
+        // if minTime is 0, the auction has ended and will be removed imminently
+        // this means that there should be a longer item on the wl,
+        // let it naturally take over in the course of the loop
+        minTime = minTimeSentinel;
+      }
+    }
+  });
+
+  const truePriceMutationObserver = new MutationObserver((mutations) => {
+    const USERSCRIPT_NOT_DIRTY_CLASS_SELECTOR = `[not(contains(concat(" ",normalize-space(@class)," ")," ${USERSCRIPT_DIRTY_CLASS} "))]`;
+    let xPathEvalCallback = (element) => {
+      // the xpathClass btn are necessary because those are added later, otherwise we're operating on old elements
+      return xPathEval(
+        [
+          // current bid, green buttons
+          `.//a${xPathClass("btn")}${USERSCRIPT_NOT_DIRTY_CLASS_SELECTOR}[starts-with(., 'Current Bid')]`,
+          // current bid, green buttons (yes, theres almost 2 of the exact same ones here
+          `.//div${xPathClass("btn")}${USERSCRIPT_NOT_DIRTY_CLASS_SELECTOR}[starts-with(., 'Current Bid')]`,
+          // bid page model, big price
+          `.//div${xPathClass("h1")}/span${USERSCRIPT_NOT_DIRTY_CLASS_SELECTOR}`,
+          // bid amount dropdown
+          `.//select/option${USERSCRIPT_NOT_DIRTY_CLASS_SELECTOR}`,
+          // status indicator when you have highest bid
+          `.//p${xPathClass("alert")}[starts-with(., \" YOU'RE WINNING \")]`,
+          // different status indicator that uses slightly different wording
+          `.//p${xPathClass("alert")}[starts-with(., \" You are WINNING \")]`,
+          // popup notification telling you you bid
+          `.//div${xPathClass("notification__title")}`,
+        ].join(" | ")
+        , element);
+    };
+    let targetsModified = new Set();
+
+    const matchingElems =
+      mutations
+        .map((rec) => {
+          if (rec.addedNodes.length === 0) {
+            targetsModified.add(rec.target);
+          }
+          return Array.from(rec.addedNodes)
+        })
+        .flat()
+        .map(xPathEvalCallback).flat()
+
+    if (targetsModified.size > 0) {
+      matchingElems.push(...xPathEvalCallback(document.body));
+    }
+    // if we try to modify the nodes right away, we get some weird react errors
+    // so instead, we use setTimeout(..., 0) to yield to the async event loop, letting react do its react things
+    // and immediately executing this when react is done doing its things
+    setTimeout(() => {
+      for (const elem of matchingElems) {
+        processPriceElem(elem);
+      }
+    }, 0);
+  });
+
+  const invoiceMutationObserver = new MutationObserver((mutations) => {
+    for (const mut of mutatations) {
+      console.log(mut.addedNodes)
+    }
+  })
+
+  const bodyObserver = new MutationObserver(function () {
+    if (document.body) {
+      _log("document.body found, attaching mutation observers");
+      activateTruePriceObserver();
+      bodyObserver.disconnect();
+      // sets the title on initial page load
+      onUrlChange(null, document.title, location.pathname);
+    }
+  });
+
+  return {
+    activateTruePriceObserver,
+    deactivateTruePriceObserver,
+    activateInvoiceObserver,
+    deactivateInvoiceObserver,
+    bodyObserver
+  };
+})();
+
+observers.bodyObserver.observe(document.documentElement, { childList: true });
 
 
 
