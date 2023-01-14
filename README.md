@@ -18,10 +18,7 @@ repo.
 
 #### WARNING
 
-Don't actually use this.
-
-GitHub UI designers designed the delete dialog the way they did for a reason. If you use this, you're bypassing that and
-making it easier to accidentally delete a repo (It's not always easy to get it back!). Please be aware of that.
+This is probably a bad idea to use.
 
 #### Demo
 
